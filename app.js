@@ -101,7 +101,7 @@ function escapeLdif(val) {
 }
 
 function normalizeMapping(mapping) {
-  if (!mapping) return { sourceParts: [], separator: ' ', trim: true, skipEmptyParts: true, attrType: 'text', dnTemplate: '' };
+  if (!mapping) return { sourceParts: [], separator: ' ', trim: true, skipEmptyParts: true, attrType: 'text', dnTemplate: '', useCustomSeparator: false, customSeparator: ',' };
   if (!mapping.sourceParts && mapping.sourceFields) {
     mapping.sourceParts = mapping.sourceFields.map((v) => ({ type: 'csv', value: v }));
     delete mapping.sourceFields;
@@ -112,6 +112,8 @@ function normalizeMapping(mapping) {
   if (mapping.skipEmptyParts === undefined) mapping.skipEmptyParts = true;
   if (mapping.attrType === undefined) mapping.attrType = 'text';
   if (mapping.dnTemplate === undefined) mapping.dnTemplate = '';
+  if (mapping.useCustomSeparator === undefined) mapping.useCustomSeparator = false;
+  if (mapping.customSeparator === undefined) mapping.customSeparator = ',';
   return mapping;
 }
 
@@ -124,7 +126,9 @@ function buildAttributeValue(row, mapping) {
     })
     .filter((v) => (m.skipEmptyParts ? String(v).trim() !== '' : true));
   if (!parts.length) return undefined;
-  const sep = m.separator ?? ' ';
+  
+  // Use custom separator if enabled (for column combining)
+  const sep = m.useCustomSeparator ? (m.customSeparator ?? ',') : (m.separator ?? ' ');
   const raw = parts.join(sep);
   const val = m.trim ? raw.trim() : raw;
   
@@ -152,7 +156,9 @@ function buildLdif(rows, req) {
   const warnings = [];
 
   rows.forEach((row, idx) => {
-    const attrs = [];
+    const attrLines = [];
+    const usedAttrs = new Set();
+    const objectClasses = [];
     const dn = applyDnTemplate(req.dnTemplate, row, req.mappings);
 
     if (!dn || /\{.+\}/.test(dn)) {
@@ -160,16 +166,39 @@ function buildLdif(rows, req) {
       return;
     }
 
-    attrs.push(`dn: ${dn}`);
-    attrs.push('objectClass: inetOrgPerson');
-
     req.mappings.forEach((m) => {
       const v = buildAttributeValue(row, m);
       if (v === undefined || v === '') return;
-      attrs.push(`${m.targetAttribute}: ${escapeLdif(v)}`);
+      const target = (m.targetAttribute || '').trim();
+      if (!target) return;
+
+      const lower = target.toLowerCase();
+      if (lower === 'objectclass') {
+        // Allow multiple objectClass values; split literals/CSV content on whitespace, comma, or semicolon.
+        const parts = String(v).split(/[\s,;]+/).map((p) => p.trim()).filter(Boolean);
+        if (parts.length) {
+          parts.forEach((p) => objectClasses.push(p));
+        } else {
+          objectClasses.push(v.trim());
+        }
+        return;
+      }
+
+      if (usedAttrs.has(lower)) {
+        warnings.push(`Row ${idx + 1}: Duplicate attribute "${target}" skipped.`);
+        return;
+      }
+
+      usedAttrs.add(lower);
+      attrLines.push(`${target}: ${escapeLdif(v)}`);
     });
 
-    lines.push(attrs.join('\n'));
+    const ocUnique = Array.from(new Set(objectClasses.map((oc) => oc.trim()).filter(Boolean)));
+    const entryLines = [`dn: ${dn}`];
+    ocUnique.forEach((oc) => entryLines.push(`objectClass: ${escapeLdif(oc)}`));
+    entryLines.push(...attrLines);
+
+    lines.push(entryLines.join('\n'));
     lines.push('');
   });
 
@@ -183,6 +212,9 @@ const csvDropZone = document.getElementById('csvDropZone');
 const ldifDropZone = document.getElementById('ldifDropZone');
 const csvStatus = document.getElementById('csvStatus');
 const ldifStatus = document.getElementById('ldifStatus');
+const ldifPasteArea = document.getElementById('ldifPasteArea');
+const parseLdifPasteBtn = document.getElementById('parseLdifPasteBtn');
+const clearLdifPasteBtn = document.getElementById('clearLdifPasteBtn');
 const delimiterEl = document.getElementById('delimiter');
 const dnTemplateEl = document.getElementById('dnTemplate');
 const mappingHint = document.getElementById('mappingHint');
@@ -196,6 +228,9 @@ const selectedFieldsList = document.getElementById('selectedFieldsList');
 const concatSeparator = document.getElementById('concatSeparator');
 const concatTrim = document.getElementById('concatTrim');
 const concatSkipEmpty = document.getElementById('concatSkipEmpty');
+const useCustomSeparator = document.getElementById('useCustomSeparator');
+const customSeparator = document.getElementById('customSeparator');
+const customSeparatorGroup = document.getElementById('customSeparatorGroup');
 const literalInput = document.getElementById('literalValue');
 const attrTypeSelect = document.getElementById('attrType');
 const attrDnTemplateInput = document.getElementById('attrDnTemplate');
@@ -292,6 +327,9 @@ function renderMappingDetails() {
   concatSeparator.value = mapping.separator;
   concatTrim.checked = mapping.trim;
   concatSkipEmpty.checked = mapping.skipEmptyParts;
+  useCustomSeparator.checked = mapping.useCustomSeparator;
+  customSeparator.value = mapping.customSeparator;
+  customSeparatorGroup.style.display = mapping.useCustomSeparator ? 'flex' : 'none';
   
   // Set attribute type and DN template
   attrTypeSelect.value = mapping.attrType;
@@ -325,7 +363,9 @@ function updateMapping() {
     trim: concatTrim.checked,
     skipEmptyParts: concatSkipEmpty.checked,
     attrType: attrTypeSelect.value,
-    dnTemplate: attrDnTemplateInput.value
+    dnTemplate: attrDnTemplateInput.value,
+    useCustomSeparator: useCustomSeparator.checked,
+    customSeparator: customSeparator.value
   });
 
   renderLdifAttributes();
@@ -393,10 +433,14 @@ async function handleCsvFile(file) {
 
 async function handleLdifFile(file) {
   const text = await file.text();
+  processLdifText(text, file.name);
+}
+
+function processLdifText(text, sourceName) {
   ldifAttrs = extractLdifAttributes(text);
   ldifStatus.textContent = ldifAttrs.length
-    ? `${file.name} • ${ldifAttrs.length} attributes found`
-    : `${file.name} • No attributes detected`;
+    ? `${sourceName} • ${ldifAttrs.length} attributes found`
+    : `${sourceName} • No attributes detected`;
   ldifDropZone.classList.add('has-file');
   
   if (csvHeaders.length) {
@@ -404,8 +448,27 @@ async function handleLdifFile(file) {
   }
 }
 
+function handleLdifPaste() {
+  const text = ldifPasteArea.value.trim();
+  
+  if (!text) {
+    alert('Please paste LDIF content first.');
+    return;
+  }
+  
+  processLdifText(text, 'Pasted Content');
+}
+
+function clearLdifPaste() {
+  ldifPasteArea.value = '';
+}
+
 setupDropZone(csvDropZone, csvInput, handleCsvFile);
 setupDropZone(ldifDropZone, ldifInput, handleLdifFile);
+
+// Paste functionality
+parseLdifPasteBtn.addEventListener('click', handleLdifPaste);
+clearLdifPasteBtn.addEventListener('click', clearLdifPaste);
 
 // ===== Event Handlers =====
 ldifAttributesList.addEventListener('click', (e) => {
@@ -466,6 +529,11 @@ selectedFieldsList.addEventListener('click', (e) => {
 concatSeparator.addEventListener('input', updateMapping);
 concatTrim.addEventListener('change', updateMapping);
 concatSkipEmpty.addEventListener('change', updateMapping);
+useCustomSeparator.addEventListener('change', () => {
+  customSeparatorGroup.style.display = useCustomSeparator.checked ? 'flex' : 'none';
+  updateMapping();
+});
+customSeparator.addEventListener('input', updateMapping);
 
 attrTypeSelect.addEventListener('change', () => {
   const isDn = attrTypeSelect.value === 'dn';
@@ -593,6 +661,7 @@ resetBtn.addEventListener('click', () => {
 
   csvInput.value = '';
   ldifInput.value = '';
+  ldifPasteArea.value = '';
   csvStatus.textContent = 'No file selected';
   ldifStatus.textContent = 'No file selected';
   csvDropZone.classList.remove('has-file');

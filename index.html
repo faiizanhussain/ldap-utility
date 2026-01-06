@@ -22,12 +22,16 @@
           </svg>
         </div>
         <span>LDIF Builder</span>
-      </div>
+      </div>    
       
       <nav class="nav">
-        <a href="#" class="nav-item active">
+        <a href="index.html" class="nav-item active">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
-          Convert
+          CSV → LDIF
+        </a>
+        <a href="ldif-to-csv.html" class="nav-item">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"/></svg>
+          LDIF → CSV
         </a>
         <a href="#" class="nav-item">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
@@ -51,10 +55,6 @@
           <button class="btn btn-secondary" id="resetBtn">
             <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
             Reset
-          </button>
-          <button class="btn btn-primary" id="convertBtn">
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd"/></svg>
-            Convert to LDIF
           </button>
         </div>
       </header>
@@ -129,6 +129,26 @@
               </div>
             </div>
 
+            <div class="paste-section create-mode-only">
+              <div class="paste-header">
+                <span>Or paste LDIF content directly:</span>
+                <button class="btn btn-outline btn-sm" id="clearLdifPasteBtn">Clear</button>
+              </div>
+              <textarea id="ldifPasteArea" class="paste-textarea" placeholder="Paste LDIF content here to extract attributes...
+
+Example:
+dn: cn=john.doe,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+cn: john.doe
+sn: Doe
+givenName: John
+mail: john.doe@example.com"></textarea>
+              <button class="btn btn-primary" id="parseLdifPasteBtn">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd"/></svg>
+                Parse LDIF
+              </button>
+            </div>
+
             <div class="settings-row">
               <div class="form-group">
                 <label for="delimiter">Delimiter</label>
@@ -137,7 +157,7 @@
               </div>
               <div class="form-group flex-grow create-mode-only">
                 <label for="dnTemplate">DN Template</label>
-                <input type="text" id="dnTemplate" class="input" value="cn={cn},ou=People,dc=example,dc=com" />
+                <input type="text" id="dnTemplate" class="input" value="cn={cn},cn=users,dc=maliyah,dc=gov" />
                 <span class="hint">Use {attribute} placeholders for dynamic values</span>
               </div>
             </div>
@@ -217,7 +237,7 @@
                     </div>
                     <div class="form-group dn-template-group" id="dnTemplateGroup" style="display: none;">
                       <label for="attrDnTemplate">DN Template for this Attribute</label>
-                      <input type="text" id="attrDnTemplate" class="input" placeholder="cn={value},ou=People,dc=example,dc=com" />
+                      <input type="text" id="attrDnTemplate" class="input" placeholder="cn={value},cn=users,dc=maliyah,dc=gov" />
                       <span class="hint">Use {value} as placeholder for the mapped value (e.g., manager's civil ID).</span>
                     </div>
                   </div>
@@ -226,6 +246,18 @@
                       <label>Concatenation Separator</label>
                       <input type="text" id="concatSeparator" class="input" value=" " placeholder="Space" />
                       <span class="hint">Character(s) to join multiple fields (e.g., space, comma, dash)</span>
+                    </div>
+                    <div class="form-group">
+                      <label class="toggle-item">
+                        <input type="checkbox" id="useCustomSeparator" />
+                        <span>Use Custom Separator for Column Combining</span>
+                      </label>
+                      <span class="hint">Enable this to combine multiple CSV columns with a delimiter that can be split later in LDIF → CSV</span>
+                    </div>
+                    <div class="form-group" id="customSeparatorGroup" style="display: none;">
+                      <label>Custom Separator (for splitting later)</label>
+                      <input type="text" id="customSeparator" class="input" value="," placeholder="," />
+                      <span class="hint">Use a unique delimiter (e.g., comma, pipe |, or semicolon ;) to combine columns so they can be easily split in the LDIF → CSV tool</span>
                     </div>
                     <div class="toggle-group">
                       <label class="toggle-item">
@@ -262,13 +294,19 @@
               <h2>Preview & Download</h2>
               <p>Review the generated LDIF output before downloading</p>
             </div>
-            <button class="btn btn-success" id="downloadBtn" disabled>
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-              Download LDIF
-            </button>
+            <div class="header-actions">
+              <button class="btn btn-primary" id="convertBtn">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd"/></svg>
+                Convert to LDIF
+              </button>
+              <button class="btn btn-success" id="downloadBtn" disabled>
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                Download LDIF
+              </button>
+            </div>
           </div>
           <div class="card-body">
-            <div id="warnings" class="alert alert-warning" hidden></div>
+                      <div id="warnings" class="alert alert-warning" hidden></div>
             <div class="preview-container">
               <div class="preview-header">
                 <span>output.ldif</span>
@@ -280,6 +318,7 @@
             </div>
           </div>
         </section>
+
       </div>
     </main>
   </div>
