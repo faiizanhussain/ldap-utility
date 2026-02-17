@@ -719,31 +719,80 @@ function buildGroupOperationsLdif(rows, operations) {
   const warnings = [];
 
   operations.forEach((op) => {
-    const members = [];
-    
-    rows.forEach((row, idx) => {
-      const value = row[op.csvColumn] ?? '';
-      if (!value || !value.trim()) {
-        warnings.push(`Row ${idx + 1}: Empty value for column "${op.csvColumn}"`);
+    if (op.useGroupColumn) {
+      // Dynamic groups from CSV column
+      const groupMap = new Map(); // Map of groupDn => members
+      
+      rows.forEach((row, idx) => {
+        const memberValue = row[op.csvColumn] ?? '';
+        if (!memberValue || !memberValue.trim()) {
+          warnings.push(`Row ${idx + 1}: Empty value for member column "${op.csvColumn}"`);
+          return;
+        }
+        
+        const groupValue = row[op.groupColumn] ?? '';
+        if (!groupValue || !groupValue.trim()) {
+          warnings.push(`Row ${idx + 1}: Empty value for group column "${op.groupColumn}"`);
+          return;
+        }
+        
+        // Split groups by delimiter
+        const groups = groupValue.split(op.groupDelimiter || ';').map(g => g.trim()).filter(g => g);
+        const memberDn = op.memberDnTemplate.replace(/\{value\}/gi, memberValue.trim());
+        
+        groups.forEach((group) => {
+          // Apply group DN template if specified
+          const groupDn = op.groupDnTemplate ? op.groupDnTemplate.replace(/\{value\}/gi, group) : group;
+          if (!groupMap.has(groupDn)) {
+            groupMap.set(groupDn, []);
+          }
+          groupMap.get(groupDn).push(memberDn);
+        });
+      });
+
+      if (groupMap.size === 0) {
+        warnings.push(`Operation (dynamic groups): No valid group/member combinations found`);
         return;
       }
+
+      // Generate LDIF for each group
+      groupMap.forEach((members, groupDn) => {
+        lines.push(`dn: ${groupDn}`);
+        lines.push('changetype: modify');
+        lines.push(`${op.operation}: ${op.memberAttr}`);
+        members.forEach((dn) => {
+          lines.push(`${op.memberAttr}: ${dn}`);
+        });
+        lines.push('');
+      });
+    } else {
+      // Static group - original behavior
+      const members = [];
       
-      const memberDn = op.memberDnTemplate.replace(/\{value\}/gi, value.trim());
-      members.push(memberDn);
-    });
+      rows.forEach((row, idx) => {
+        const value = row[op.csvColumn] ?? '';
+        if (!value || !value.trim()) {
+          warnings.push(`Row ${idx + 1}: Empty value for column "${op.csvColumn}"`);
+          return;
+        }
+        
+        const memberDn = op.memberDnTemplate.replace(/\{value\}/gi, value.trim());
+        members.push(memberDn);
+      });
 
-    if (members.length === 0) {
-      warnings.push(`Operation "${op.groupDn}": No valid members found`);
-      return;
+      if (members.length === 0) {
+        warnings.push(`Operation "${op.groupDn}": No valid members found`);
+        return;
+      }
+
+      lines.push(`dn: ${op.groupDn}`);
+      lines.push('changetype: modify');
+      lines.push(`${op.operation}: ${op.memberAttr}`);
+      members.forEach((dn) => {
+        lines.push(`${op.memberAttr}: ${dn}`);
+      });
+      lines.push('');
     }
-
-    lines.push(`dn: ${op.groupDn}`);
-    lines.push('changetype: modify');
-    lines.push(`${op.operation}: ${op.memberAttr}`);
-    members.forEach((dn) => {
-      lines.push(`${op.memberAttr}: ${dn}`);
-    });
-    lines.push('');
   });
 
   return { ldif: lines.join('\n'), warnings };
@@ -764,10 +813,43 @@ function renderOperations() {
         <button class="btn btn-secondary btn-sm" onclick="removeOperation(${op.id})">Remove</button>
       </div>
       <div class="operation-body">
-        <div class="form-group">
-          <label>Group DN</label>
-          <input type="text" class="input" value="${op.groupDn}" onchange="updateOperation(${op.id}, 'groupDn', this.value)" />
+        <div class="form-group toggle-item">
+          <label>
+            <input type="checkbox" ${op.useGroupColumn ? 'checked' : ''} onchange="updateOperation(${op.id}, 'useGroupColumn', this.checked)" />
+            <span>Use Group Names from CSV?</span>
+          </label>
+          <span class="hint">Enable to map group names from a CSV column (supports multiple groups per row)</span>
         </div>
+
+        ${!op.useGroupColumn ? `
+          <div class="form-group">
+            <label>Group DN</label>
+            <input type="text" class="input" value="${op.groupDn}" onchange="updateOperation(${op.id}, 'groupDn', this.value)" />
+            <span class="hint">Static group DN for all members</span>
+          </div>
+        ` : ''}
+
+        ${op.useGroupColumn ? `
+          <div class="form-group">
+            <label>Group Column</label>
+            <select class="input" onchange="updateOperation(${op.id}, 'groupColumn', this.value)">
+              <option value="">-- Select column --</option>
+              ${csvHeaders.map((col) => `<option value="${col}" ${op.groupColumn === col ? 'selected' : ''}>${col}</option>`).join('')}
+            </select>
+            <span class="hint">CSV column containing group names or DNs</span>
+          </div>
+          <div class="form-group">
+            <label>Group DN Template</label>
+            <input type="text" class="input" value="${op.groupDnTemplate}" onchange="updateOperation(${op.id}, 'groupDnTemplate', this.value)" placeholder="cn={value},ou=groups,dc=example,dc=com" />
+            <span class="hint">Optional: Use {value} as placeholder to build full DNs from group names. Leave empty if CSV contains full DNs.</span>
+          </div>
+          <div class="form-group">
+            <label>Group Delimiter</label>
+            <input type="text" class="input" value="${op.groupDelimiter || ';'}" onchange="updateOperation(${op.id}, 'groupDelimiter', this.value)" placeholder=";" />
+            <span class="hint">Character(s) to split multiple groups (e.g., ; or |)</span>
+          </div>
+        ` : ''}
+
         <div class="operation-row">
           <div class="form-group">
             <label>Operation</label>
@@ -785,16 +867,17 @@ function renderOperations() {
             </select>
           </div>
           <div class="form-group">
-            <label>CSV Column</label>
+            <label>Member Column</label>
             <select class="input" onchange="updateOperation(${op.id}, 'csvColumn', this.value)">
               ${csvHeaders.map((col) => `<option value="${col}" ${op.csvColumn === col ? 'selected' : ''}>${col}</option>`).join('')}
             </select>
+            <span class="hint">CSV column with member identifiers</span>
           </div>
         </div>
         <div class="form-group">
           <label>Member DN Template</label>
           <input type="text" class="input" value="${op.memberDnTemplate}" onchange="updateOperation(${op.id}, 'memberDnTemplate', this.value)" placeholder="cn={value},cn=users,dc=example,dc=com" />
-          <span class="hint">Use {value} as placeholder for the CSV column value</span>
+          <span class="hint">Use {value} as placeholder for the member column value</span>
         </div>
       </div>
     </div>
@@ -813,7 +896,11 @@ function addOperation() {
     operation: 'add',
     memberAttr: 'member',
     csvColumn: csvHeaders[0],
-    memberDnTemplate: 'cn={value},cn=users,dc=example,dc=com'
+    memberDnTemplate: 'cn={value},cn=users,dc=example,dc=com',
+    useGroupColumn: false,
+    groupColumn: '',
+    groupDnTemplate: 'cn={value},cn=groups,dc=example,dc=com',
+    groupDelimiter: ';'
   };
   
   operations.push(newOp);
@@ -829,6 +916,7 @@ function updateOperation(id, field, value) {
   const op = operations.find((o) => o.id === id);
   if (op) {
     op[field] = value;
+    renderOperations(); // Re-render to show/hide fields based on useGroupColumn
   }
 }
 
