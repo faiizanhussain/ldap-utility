@@ -1,385 +1,568 @@
 <!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LDIF Data Cleaner</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LDIF Data Cleaner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+/* ─── TOKENS ─── */
+:root{
+  --accent:#66ff00;--accent-rgb:102,255,0;
+  --bg:#080808;--bg-1:#0f0f0f;--bg-2:#141414;--bg-3:#1a1a1a;
+  --border:rgba(255,255,255,.07);--border-hover:rgba(255,255,255,.14);
+  --text:#f0f0f0;--text-2:#a0a0a0;--text-3:#606060;
+  --red:#ff4d4d;--yellow:#f5a623;--blue:#4d9fff;
+  --r:10px;--r-sm:6px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;opacity:.028;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:200px 200px}
+
+/* ─── NAV ─── */
+nav{position:fixed;top:0;left:0;right:0;z-index:500;height:60px;display:flex;align-items:center;padding:0 32px;border-bottom:1px solid var(--border);background:rgba(8,8,8,.82);backdrop-filter:blur(24px) saturate(1.8);-webkit-backdrop-filter:blur(24px) saturate(1.8)}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;font-size:15px;font-weight:600;color:var(--text);flex-shrink:0}
+.nav-logo-mark{width:30px;height:30px;background:var(--accent);border-radius:7px;display:grid;place-items:center;transition:background .3s}
+.nav-pill{margin-left:12px;border-radius:100px;padding:2px 10px;font-size:11px;font-weight:600;letter-spacing:.04em;background:rgba(var(--accent-rgb),.12);border:1px solid rgba(var(--accent-rgb),.2);color:var(--accent);transition:background .3s,border-color .3s,color .3s}
+.nav-links{display:flex;align-items:center;gap:4px;margin-left:28px;flex:1}
+.nav-link{font-size:13.5px;color:var(--text-2);text-decoration:none;padding:5px 12px;border-radius:var(--r-sm);transition:color .15s,background .15s;font-weight:400}
+.nav-link:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.nav-link.active{color:var(--text);background:rgba(255,255,255,.06)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.btn-ghost{font-size:13px;color:var(--text-2);text-decoration:none;padding:7px 14px;border-radius:var(--r-sm);border:1px solid var(--border);transition:color .15s,border-color .15s;font-weight:500;cursor:pointer;background:none;display:inline-flex;align-items:center;gap:6px}
+.btn-ghost:hover{color:var(--text);border-color:var(--border-hover)}
+
+/* ─── LAYOUT ─── */
+.page-wrap{max-width:920px;margin:0 auto;padding:80px 24px 80px}
+.page-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:32px}
+.page-title{font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.5px;margin-bottom:5px}
+.page-subtitle{font-size:14px;color:var(--text-2);line-height:1.5}
+
+/* ─── CARDS ─── */
+.card{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.card-header{display:flex;align-items:center;gap:14px;padding:18px 24px;border-bottom:1px solid var(--border)}
+.card-header>div:not(.step-badge):not(.header-actions){flex:1;min-width:0}
+.card-header h2{font-size:15px;font-weight:600;color:var(--text);margin-bottom:2px}
+.card-header p{font-size:13px;color:var(--text-2)}
+.card-body{padding:24px}
+.header-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
+
+/* ─── STEP BADGE ─── */
+.step-badge{width:28px;height:28px;border-radius:50%;background:rgba(var(--accent-rgb),.12);border:1px solid rgba(var(--accent-rgb),.25);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--accent);font-family:'Geist Mono',monospace;flex-shrink:0}
+
+/* ─── BUTTONS ─── */
+.btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;border-radius:var(--r-sm);padding:7px 14px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:opacity .15s,transform .15s,background .15s,border-color .15s,color .15s;text-decoration:none}
+.btn-primary{background:var(--accent);color:#080808;font-weight:600}
+.btn-primary:hover{opacity:.88;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-secondary{background:var(--bg-3);color:var(--text-2);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--border-hover);color:var(--text)}
+.btn-secondary:disabled{opacity:.4;cursor:not-allowed}
+.btn-outline{background:transparent;color:var(--text-2);border:1px solid var(--border)}
+.btn-outline:hover{border-color:var(--border-hover);color:var(--text)}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+/* ─── FORMS ─── */
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:12px;font-weight:500;color:var(--text-2);letter-spacing:.02em}
+.input{background:var(--bg-2);border:1px solid var(--border);color:var(--text);border-radius:var(--r-sm);padding:8px 12px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;width:100%;transition:border-color .15s}
+.input:focus{border-color:rgba(var(--accent-rgb),.4)}
+.input::placeholder{color:var(--text-3)}
+select.input{cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 20 20' fill='%23606060'%3E%3Cpath d='M10 14l-5-5h10l-5 5z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+.hint{font-size:11px;color:var(--text-3);line-height:1.4}
+
+/* ─── UPLOAD ─── */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.upload-zone{background:var(--bg-2);border:1px dashed var(--border-hover);border-radius:var(--r);padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center;position:relative}
+.upload-zone:hover,.upload-zone.drag-over{border-color:rgba(var(--accent-rgb),.4);background:rgba(var(--accent-rgb),.03)}
+.upload-icon{width:48px;height:48px;border-radius:10px;background:var(--bg-3);border:1px solid var(--border);display:grid;place-items:center;color:var(--text-3)}
+.upload-icon.ldif{color:var(--blue);border-color:rgba(77,159,255,.2);background:rgba(77,159,255,.08)}
+.upload-text strong{display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+.upload-text span{font-size:12px;color:var(--text-3)}
+.upload-label{display:block;font-size:12px;font-weight:500;color:var(--text-2);margin-bottom:8px}
+.file-status{margin-top:10px;font-size:12px;color:var(--text-3);font-family:'Geist Mono',monospace}
+.file-status.loaded{color:var(--accent)}
+
+/* ─── MODE SELECTOR ─── */
+.mode-selector-card .card-body{padding:20px 24px}
+.mode-selector{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mode-option{cursor:pointer;position:relative}
+.mode-option input[type=radio]{position:absolute;opacity:0;pointer-events:none}
+.mode-content{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:flex;align-items:center;gap:14px;transition:border-color .15s,background .15s}
+.mode-option input:checked+.mode-content{border-color:rgba(var(--accent-rgb),.4);background:rgba(var(--accent-rgb),.05)}
+.mode-content:hover{border-color:var(--border-hover)}
+.mode-icon{width:44px;height:44px;border-radius:9px;display:grid;place-items:center;flex-shrink:0}
+.mode-icon.create{background:rgba(var(--accent-rgb),.1);color:var(--accent);border:1px solid rgba(var(--accent-rgb),.2)}
+.mode-icon.groups{background:rgba(77,159,255,.1);color:var(--blue);border:1px solid rgba(77,159,255,.2)}
+.mode-text strong{display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.mode-text span{font-size:12px;color:var(--text-3)}
+
+/* ─── HIDDEN ─── */
+.hidden{display:none!important}
+
+/* ─── FIX OPERATIONS ─── */
+.fix-operations-container{display:flex;flex-direction:column;gap:20px}
+.repeatable-attributes-card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);padding:20px}
+.repeatable-attributes-header h3{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+.repeatable-attributes-header p{font-size:12px;color:var(--text-3);margin-bottom:16px}
+.repeatable-attributes-controls{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px}
+.repeatable-inline-controls{display:flex;gap:8px}
+.repeatable-inline-controls input,.repeatable-inline-controls select{flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--r-sm);padding:7px 10px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s}
+.repeatable-inline-controls input:focus,.repeatable-inline-controls select:focus{border-color:rgba(var(--accent-rgb),.4)}
+.repeatable-inline-controls input::placeholder{color:var(--text-3)}
+.repeatable-attributes-list{display:flex;flex-wrap:wrap;gap:6px;min-height:28px;padding:4px 0}
+.operations-list{display:flex;flex-direction:column;gap:12px}
+
+/* ─── DEDUP RESULTS ─── */
+.results-container{display:flex;flex-direction:column;gap:20px}
+.algorithm-explanation{background:rgba(77,159,255,.06);border:1px solid rgba(77,159,255,.15);border-radius:var(--r);padding:16px}
+.explanation-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;color:var(--blue)}
+.explanation-header h3{font-size:14px;font-weight:600}
+.explanation-text{font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:10px}
+.explanation-details{display:flex;flex-direction:column;gap:4px}
+.detail-item{font-size:12px;color:var(--text-3)}
+.detail-item strong{color:var(--text-2)}
+.result-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat-item{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);padding:16px;text-align:center}
+.stat-label{font-size:11px;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+.stat-value{font-size:28px;font-weight:700;color:var(--text);font-family:'Geist Mono',monospace}
+.stat-value.info{color:var(--blue)}
+.stat-value.danger{color:var(--red)}
+.stat-value.success{color:var(--accent)}
+.results-preview{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.results-preview .preview-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg-3);border-bottom:1px solid var(--border)}
+.results-preview .preview-header h3{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+.preview-info{font-size:12px;color:var(--text-3)}
+.duplicates-list{max-height:240px;overflow-y:auto;padding:8px 0}
+.duplicates-list::-webkit-scrollbar{width:4px}
+.duplicates-list::-webkit-scrollbar-thumb{background:var(--border-hover);border-radius:2px}
+.duplicate-item{padding:8px 16px;font-size:12px;font-family:'Geist Mono',monospace;color:var(--red);border-bottom:1px solid var(--border)}
+.duplicate-item:last-child{border-bottom:none}
+.action-buttons{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* ─── FIX OUTPUT ─── */
+.output-container{display:flex;flex-direction:column;gap:16px}
+.output-preview textarea{width:100%;height:300px;background:var(--bg-3);border:1px solid var(--border);color:var(--text-2);border-radius:var(--r-sm);padding:16px;font-size:12px;font-family:'Geist Mono',monospace;line-height:1.7;outline:none;resize:vertical;transition:border-color .15s}
+.output-preview textarea:focus{border-color:rgba(var(--accent-rgb),.4)}
+
+/* ─── THEME PANEL ─── */
+.theme-btn{position:fixed;bottom:28px;right:28px;z-index:600;width:44px;height:44px;border-radius:50%;background:var(--bg-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color .2s,transform .2s;box-shadow:0 4px 24px rgba(0,0,0,.5)}
+.theme-btn:hover{border-color:var(--accent);transform:scale(1.05)}
+.theme-swatch{width:18px;height:18px;border-radius:50%;background:var(--accent);transition:background .3s}
+.theme-panel{position:fixed;bottom:84px;right:28px;z-index:601;background:var(--bg-2);border:1px solid var(--border);border-radius:16px;padding:20px;width:248px;box-shadow:0 20px 60px rgba(0,0,0,.6);transform:translateY(12px) scale(.96);opacity:0;pointer-events:none;transition:transform .2s ease,opacity .2s ease}
+.theme-panel.open{transform:translateY(0) scale(1);opacity:1;pointer-events:all}
+.tp-title{font-size:12px;font-weight:600;color:var(--text-2);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px}
+.tp-presets{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px}
+.tp-preset{width:100%;aspect-ratio:1;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .15s,border-color .15s}
+.tp-preset:hover{transform:scale(1.15)}
+.tp-preset.selected{border-color:var(--text)}
+.tp-input-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.tp-hash{font-family:'Geist Mono',monospace;font-size:13px;color:var(--text-3)}
+.tp-hex{flex:1;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 10px;font-family:'Geist Mono',monospace;font-size:13px;color:var(--text);outline:none;transition:border-color .15s;letter-spacing:.06em;text-transform:uppercase}
+.tp-hex:focus{border-color:var(--accent)}
+.tp-hex::placeholder{color:var(--text-3)}
+.tp-apply{background:var(--accent);color:#080808;border:none;border-radius:var(--r-sm);padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .15s,background .3s;white-space:nowrap}
+.tp-apply:hover{opacity:.85}
+.tp-live-row{display:flex;align-items:center;gap:8px}
+.tp-live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);transition:background .3s}
+.tp-live-label{font-size:11px;color:var(--text-3)}
+.tp-error{font-size:11px;color:#ff4d4d;margin-top:6px;min-height:16px;font-family:'Geist Mono',monospace}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:768px){
+  nav{padding:0 16px}
+  .nav-links{display:none}
+  .page-wrap{padding:76px 16px 60px}
+  .upload-grid{grid-template-columns:1fr}
+  .result-stats{grid-template-columns:1fr 1fr}
+  .repeatable-attributes-controls{grid-template-columns:1fr}
+}
+  </style>
 </head>
-
 <body>
-    <div class="app">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo">
-                <div class="logo-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z"
-                            fill="#0078D4" />
-                        <path d="M14 2V8H20" fill="#50E6FF" />
-                        <path d="M16 13H8V15H16V13ZM16 17H8V19H16V17ZM14 9H8V11H14V9Z" fill="white" />
-                    </svg>
-                </div>
-                <span>LDIF Builder</span>
-            </div>
 
-            <nav class="nav">
-                <a href="index.html" class="nav-item">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                        <path fill-rule="evenodd"
-                            d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z"
-                            clip-rule="evenodd" />
-                    </svg>
-                    CSV → LDIF
-                </a>
-                <a href="ldif-to-csv.html" class="nav-item">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z"
-                            clip-rule="evenodd" />
-                    </svg>
-                    LDIF → CSV
-                </a>
-                <a href="ldif-cleaner.html" class="nav-item active">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                        <path fill-rule="evenodd"
-                            d="M4 5a2 2 0 012-2 1 1 0 000 2H3a1 1 0 00-1 1v9a2 2 0 002 2h10a2 2 0 002-2V8a1 1 0 100-2h1a2 2 0 012 2v9a4 4 0 01-4 4H6a4 4 0 01-4-4V5z"
-                            clip-rule="evenodd" />
-                        <path fill-rule="evenodd"
-                            d="M7 9a1 1 0 011-1h4a1 1 0 11 0 2H8a1 1 0 01-1-1z" clip-rule="evenodd" />
-                    </svg>
-                    LDIF Cleaner
-                </a>
-                <a href="#" class="nav-item">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                            clip-rule="evenodd" />
-                    </svg>
-                    Help
-                </a>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="version">v1.0.0</div>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main">
-            <header class="header">
-                <div>
-                    <h1>LDIF Data Cleaner</h1>
-                    <p class="subtitle">Clean, fix, and validate your LDIF entries by removing duplicates and fixing attributes</p>
-                </div>
-                <div class="header-actions">
-                    <button class="btn btn-secondary" id="resetBtn">
-                        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd"
-                                d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-                                clip-rule="evenodd" />
-                        </svg>
-                        Reset
-                    </button>
-                </div>
-            </header>
-
-            <div class="content">
-                <!-- Mode Selector -->
-                <section class="card mode-selector-card">
-                    <div class="card-body">
-                        <div class="mode-selector">
-                            <label class="mode-option">
-                                <input type="radio" name="cleanMode" value="fix" checked />
-                                <div class="mode-content">
-                                    <div class="mode-icon create">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                        </svg>
-                                    </div>
-                                    <div class="mode-text">
-                                        <strong>Fix Attributes</strong>
-                                        <span>Fix DN, object class, or attributes</span>
-                                    </div>
-                                </div>
-                            </label>
-                            <label class="mode-option">
-                                <input type="radio" name="cleanMode" value="dedup" />
-                                <div class="mode-content">
-                                    <div class="mode-icon groups">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="9" cy="9" r="2" />
-                                            <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                                            <circle cx="9" cy="17" r="2" />
-                                            <path d="M9 15v-2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                                            <circle cx="17" cy="13" r="2" />
-                                            <path d="M15 13h-2a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h2" />
-                                        </svg>
-                                    </div>
-                                    <div class="mode-text">
-                                        <strong>Remove Duplicates</strong>
-                                        <span>Compare and remove duplicate entries</span>
-                                    </div>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Fix Attributes Mode -->
-                <section id="fixMode" class="card mode-section">
-                    <div class="card-header">
-                        <div class="step-badge">1</div>
-                        <div>
-                            <h2>Upload LDIF File to Fix</h2>
-                            <p>Upload your LDIF file with entries that need attribute fixes</p>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="upload-zone" id="fixDropZone">
-                            <input type="file" id="fixInput" accept=".ldif,.txt" hidden />
-                            <div class="upload-icon ldif">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                    <polyline points="14 2 14 8 20 8" />
-                                    <path d="M12 18v-6m-3 3h6" />
-                                </svg>
-                            </div>
-                            <div class="upload-text">
-                                <strong>Click to upload or drag and drop</strong>
-                                <span>.ldif or .txt file</span>
-                            </div>
-                        </div>
-                        <div id="fixFileStatus" class="file-status"></div>
-                    </div>
-                </section>
-
-                <!-- Fix Operations -->
-                <section id="fixOperations" class="card hidden">
-                    <div class="card-header">
-                        <div class="step-badge">2</div>
-                        <div>
-                            <h2>Fix Entries</h2>
-                            <p>Select which attributes to fix for all entries</p>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="fix-operations-container">
-                            <div class="repeatable-attributes-card">
-                                <div class="repeatable-attributes-header">
-                                    <h3>Repeatable Attributes</h3>
-                                    <p>These attributes keep multiple values across fixes (default: objectClass, replace)</p>
-                                </div>
-                                <div class="repeatable-attributes-controls">
-                                    <div class="form-group">
-                                        <label>Predefined Attribute</label>
-                                        <div class="repeatable-inline-controls">
-                                            <select id="repeatablePreset">
-                                                <option value="objectClass">objectClass</option>
-                                                <option value="replace">replace</option>
-                                            </select>
-                                            <button id="addRepeatablePreset" type="button" class="btn btn-secondary">Add</button>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Custom Repeatable Attribute</label>
-                                        <div class="repeatable-inline-controls">
-                                            <input type="text" id="customRepeatableAttr" placeholder="e.g., changetype" />
-                                            <button id="addCustomRepeatable" type="button" class="btn btn-secondary">Add</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div id="repeatableAttributesList" class="repeatable-attributes-list"></div>
-                            </div>
-                            <div class="operations-list" id="fixOperationsList">
-                                <!-- Dynamic operations will be added here -->
-                            </div>
-                            <button id="addFixOperation" class="btn btn-secondary">
-                                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
-                                </svg>
-                                Add Another Fix
-                            </button>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Remove Duplicates Mode -->
-                <section id="dedupMode" class="card mode-section hidden">
-                    <div class="card-header">
-                        <div class="step-badge">1</div>
-                        <div>
-                            <h2>Upload Files</h2>
-                            <p>Upload your Extract Sheet and Your Master Sheet to remove duplicates</p>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="upload-grid">
-                            <div>
-                                <label class="upload-label">Extract Sheet (from LDAP Explorer)</label>
-                                <div class="upload-zone" id="extractDropZone">
-                                    <input type="file" id="extractInput" accept=".ldif,.txt" hidden />
-                                    <div class="upload-icon ldif">
-                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                            <polyline points="14 2 14 8 20 8" />
-                                            <path d="M9 12h6m-3-3v6" />
-                                        </svg>
-                                    </div>
-                                    <div class="upload-text">
-                                        <strong>Click to upload</strong>
-                                        <span>.ldif or .txt file</span>
-                                    </div>
-                                </div>
-                                <div id="extractFileStatus" class="file-status"></div>
-                            </div>
-                            <div>
-                                <label class="upload-label">Your Master Sheet</label>
-                                <div class="upload-zone" id="masterDropZone">
-                                    <input type="file" id="masterInput" accept=".ldif,.txt" hidden />
-                                    <div class="upload-icon ldif">
-                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                            <polyline points="14 2 14 8 20 8" />
-                                            <path d="M9 12h6m-3-3v6" />
-                                        </svg>
-                                    </div>
-                                    <div class="upload-text">
-                                        <strong>Click to upload</strong>
-                                        <span>.ldif or .txt file</span>
-                                    </div>
-                                </div>
-                                <div id="masterFileStatus" class="file-status"></div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Dedup Results -->
-                <section id="dedupResults" class="card hidden">
-                    <div class="card-header">
-                        <div class="step-badge">2</div>
-                        <div>
-                            <h2>Duplicate Removal Results</h2>
-                            <p>Review and download the cleaned entries</p>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="results-container">
-                            <!-- Algorithm Explanation -->
-                            <div class="algorithm-explanation">
-                                <div class="explanation-header">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
-                                    </svg>
-                                    <h3>How Duplicates Are Identified</h3>
-                                </div>
-                                <p class="explanation-text">
-                                    We compare the <strong>Distinguished Name (DN)</strong> of each entry in your <strong>Master Sheet</strong> 
-                                    with all entries in your <strong>Extract Sheet</strong> (from LDAP Explorer). When a DN from your Master Sheet 
-                                    matches a DN in the Extract Sheet, it's marked as a duplicate. This means the entry already exists in your LDAP 
-                                    directory and can be removed to avoid re-creating existing objects.
-                                </p>
-                                <div class="explanation-details">
-                                    <span class="detail-item"><strong>Comparison:</strong> DN matching (case-insensitive)</span>
-                                    <span class="detail-item"><strong>Source of Duplicates:</strong> Entries from Your Master Sheet that exist in Extract Sheet</span>
-                                    <span class="detail-item"><strong>Action:</strong> These entries will be removed from your Master Sheet</span>
-                                </div>
-                            </div>
-
-                            <!-- Statistics -->
-                            <div class="result-stats">
-                                <div class="stat-item">
-                                    <div class="stat-label">Entries in Extract Sheet</div>
-                                    <div class="stat-value info" id="totalExtractEntries">0</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-label">Entries in Your Master Sheet</div>
-                                    <div class="stat-value" id="totalMasterEntries">0</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-label">Duplicates Found</div>
-                                    <div class="stat-value danger" id="duplicateCount">0</div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-label">Unique Entries After Removal</div>
-                                    <div class="stat-value success" id="cleanedEntryCount">0</div>
-                                </div>
-                            </div>
-
-                            <!-- Duplicates List -->
-                            <div class="results-preview">
-                                <div class="preview-header">
-                                    <h3>
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
-                                        </svg>
-                                        Duplicate Entries Found in Your Master Sheet
-                                    </h3>
-                                    <span class="preview-info" id="duplicateListInfo">These entries will be removed</span>
-                                </div>
-                                <div class="duplicates-list" id="duplicatesList">
-                                    <!-- Duplicates will be listed here -->
-                                </div>
-                            </div>
-
-                            <!-- Action Buttons -->
-                            <div class="action-buttons">
-                                <button id="downloadCleanedLdif" class="btn btn-primary">
-                                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                    Download Cleaned Master Sheet
-                                </button>
-                                <button id="downloadDuplicatesReport" class="btn btn-secondary">
-                                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
-                                    </svg>
-                                    Download Duplicates Report
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Fix Output -->
-                <section id="fixOutput" class="card hidden">
-                    <div class="card-header">
-                        <div class="step-badge">3</div>
-                        <div>
-                            <h2>Fixed LDIF Output</h2>
-                            <p>Download your cleaned LDIF file</p>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="output-container">
-                            <div class="output-preview">
-                                <textarea id="fixedLdifOutput" readonly placeholder="Fixed LDIF will appear here..."></textarea>
-                            </div>
-                            <div class="action-buttons">
-                                <button id="downloadFixedLdif" class="btn btn-primary">
-                                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                    Download Fixed LDIF
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </main>
+<nav>
+  <a href="index.html" class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+        <rect x="2" y="4" width="16" height="3" rx="1.5" fill="#080808"/>
+        <rect x="2" y="9" width="12" height="3" rx="1.5" fill="#080808"/>
+        <rect x="2" y="14" width="8" height="3" rx="1.5" fill="#080808"/>
+      </svg>
     </div>
+    LDIF Builder
+  </a>
+  <span class="nav-pill">Free</span>
+  <div class="nav-links">
+    <a href="csv-to-ldif.html" class="nav-link">CSV → LDIF</a>
+    <a href="ldif-to-csv.html" class="nav-link">LDIF → CSV</a>
+    <a href="ldif-cleaner.html" class="nav-link active">LDIF Cleaner</a>
+  </div>
+  <div class="nav-right">
+    <a href="index.html" class="btn-ghost">← Home</a>
+  </div>
+</nav>
 
-    <script src="ldif-cleaner.js"></script>
+<div class="page-wrap">
+  <div class="page-header-row">
+    <div>
+      <h1 class="page-title">LDIF Data Cleaner</h1>
+      <p class="page-subtitle">Clean, fix, and validate your LDIF entries by removing duplicates and fixing attributes</p>
+    </div>
+    <div>
+      <button class="btn btn-secondary" id="resetBtn">
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+        </svg>
+        Reset
+      </button>
+    </div>
+  </div>
+
+  <!-- Mode Selector -->
+  <section class="card mode-selector-card">
+    <div class="card-body">
+      <div class="mode-selector">
+        <label class="mode-option">
+          <input type="radio" name="cleanMode" value="fix" checked />
+          <div class="mode-content">
+            <div class="mode-icon create">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </div>
+            <div class="mode-text">
+              <strong>Fix Attributes</strong>
+              <span>Fix DN, object class, or attributes</span>
+            </div>
+          </div>
+        </label>
+        <label class="mode-option">
+          <input type="radio" name="cleanMode" value="dedup" />
+          <div class="mode-content">
+            <div class="mode-icon groups">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="9" cy="9" r="2" />
+                <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                <circle cx="9" cy="17" r="2" />
+                <path d="M9 15v-2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                <circle cx="17" cy="13" r="2" />
+                <path d="M15 13h-2a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h2" />
+              </svg>
+            </div>
+            <div class="mode-text">
+              <strong>Remove Duplicates</strong>
+              <span>Compare and remove duplicate entries</span>
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- Fix Attributes Mode -->
+  <section id="fixMode" class="card mode-section">
+    <div class="card-header">
+      <div class="step-badge">1</div>
+      <div>
+        <h2>Upload LDIF File to Fix</h2>
+        <p>Upload your LDIF file with entries that need attribute fixes</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="upload-zone" id="fixDropZone">
+        <input type="file" id="fixInput" accept=".ldif,.txt" hidden />
+        <div class="upload-icon ldif">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <path d="M12 18v-6m-3 3h6" />
+          </svg>
+        </div>
+        <div class="upload-text">
+          <strong>Click to upload or drag and drop</strong>
+          <span>.ldif or .txt file</span>
+        </div>
+      </div>
+      <div id="fixFileStatus" class="file-status"></div>
+    </div>
+  </section>
+
+  <!-- Fix Operations -->
+  <section id="fixOperations" class="card hidden">
+    <div class="card-header">
+      <div class="step-badge">2</div>
+      <div>
+        <h2>Fix Entries</h2>
+        <p>Select which attributes to fix for all entries</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="fix-operations-container">
+        <div class="repeatable-attributes-card">
+          <div class="repeatable-attributes-header">
+            <h3>Repeatable Attributes</h3>
+            <p>These attributes keep multiple values across fixes (default: objectClass, replace)</p>
+          </div>
+          <div class="repeatable-attributes-controls">
+            <div class="form-group">
+              <label>Predefined Attribute</label>
+              <div class="repeatable-inline-controls">
+                <select id="repeatablePreset">
+                  <option value="objectClass">objectClass</option>
+                  <option value="replace">replace</option>
+                </select>
+                <button id="addRepeatablePreset" type="button" class="btn btn-secondary">Add</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Custom Repeatable Attribute</label>
+              <div class="repeatable-inline-controls">
+                <input type="text" id="customRepeatableAttr" placeholder="e.g., changetype" />
+                <button id="addCustomRepeatable" type="button" class="btn btn-secondary">Add</button>
+              </div>
+            </div>
+          </div>
+          <div id="repeatableAttributesList" class="repeatable-attributes-list"></div>
+        </div>
+        <div class="operations-list" id="fixOperationsList">
+          <!-- Dynamic operations will be added here -->
+        </div>
+        <button id="addFixOperation" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+          </svg>
+          Add Another Fix
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Remove Duplicates Mode -->
+  <section id="dedupMode" class="card mode-section hidden">
+    <div class="card-header">
+      <div class="step-badge">1</div>
+      <div>
+        <h2>Upload Files</h2>
+        <p>Upload your Extract Sheet and Your Master Sheet to remove duplicates</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="upload-grid">
+        <div>
+          <label class="upload-label">Extract Sheet (from LDAP Explorer)</label>
+          <div class="upload-zone" id="extractDropZone">
+            <input type="file" id="extractInput" accept=".ldif,.txt" hidden />
+            <div class="upload-icon ldif">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <path d="M9 12h6m-3-3v6" />
+              </svg>
+            </div>
+            <div class="upload-text">
+              <strong>Click to upload</strong>
+              <span>.ldif or .txt file</span>
+            </div>
+          </div>
+          <div id="extractFileStatus" class="file-status"></div>
+        </div>
+        <div>
+          <label class="upload-label">Your Master Sheet</label>
+          <div class="upload-zone" id="masterDropZone">
+            <input type="file" id="masterInput" accept=".ldif,.txt" hidden />
+            <div class="upload-icon ldif">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <path d="M9 12h6m-3-3v6" />
+              </svg>
+            </div>
+            <div class="upload-text">
+              <strong>Click to upload</strong>
+              <span>.ldif or .txt file</span>
+            </div>
+          </div>
+          <div id="masterFileStatus" class="file-status"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dedup Results -->
+  <section id="dedupResults" class="card hidden">
+    <div class="card-header">
+      <div class="step-badge">2</div>
+      <div>
+        <h2>Duplicate Removal Results</h2>
+        <p>Review and download the cleaned entries</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="results-container">
+        <!-- Algorithm Explanation -->
+        <div class="algorithm-explanation">
+          <div class="explanation-header">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
+            </svg>
+            <h3>How Duplicates Are Identified</h3>
+          </div>
+          <p class="explanation-text">
+            We compare the <strong>Distinguished Name (DN)</strong> of each entry in your <strong>Master Sheet</strong>
+            with all entries in your <strong>Extract Sheet</strong> (from LDAP Explorer). When a DN from your Master Sheet
+            matches a DN in the Extract Sheet, it's marked as a duplicate. This means the entry already exists in your LDAP
+            directory and can be removed to avoid re-creating existing objects.
+          </p>
+          <div class="explanation-details">
+            <span class="detail-item"><strong>Comparison:</strong> DN matching (case-insensitive)</span>
+            <span class="detail-item"><strong>Source of Duplicates:</strong> Entries from Your Master Sheet that exist in Extract Sheet</span>
+            <span class="detail-item"><strong>Action:</strong> These entries will be removed from your Master Sheet</span>
+          </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="result-stats">
+          <div class="stat-item">
+            <div class="stat-label">Entries in Extract Sheet</div>
+            <div class="stat-value info" id="totalExtractEntries">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Entries in Your Master Sheet</div>
+            <div class="stat-value" id="totalMasterEntries">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Duplicates Found</div>
+            <div class="stat-value danger" id="duplicateCount">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Unique Entries After Removal</div>
+            <div class="stat-value success" id="cleanedEntryCount">0</div>
+          </div>
+        </div>
+
+        <!-- Duplicates List -->
+        <div class="results-preview">
+          <div class="preview-header">
+            <h3>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+              </svg>
+              Duplicate Entries Found in Your Master Sheet
+            </h3>
+            <span class="preview-info" id="duplicateListInfo">These entries will be removed</span>
+          </div>
+          <div class="duplicates-list" id="duplicatesList">
+            <!-- Duplicates will be listed here -->
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <button id="downloadCleanedLdif" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+            Download Cleaned Master Sheet
+          </button>
+          <button id="downloadDuplicatesReport" class="btn btn-secondary">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+            </svg>
+            Download Duplicates Report
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Fix Output -->
+  <section id="fixOutput" class="card hidden">
+    <div class="card-header">
+      <div class="step-badge">3</div>
+      <div>
+        <h2>Fixed LDIF Output</h2>
+        <p>Download your cleaned LDIF file</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="output-container">
+        <div class="output-preview">
+          <textarea id="fixedLdifOutput" readonly placeholder="Fixed LDIF will appear here..."></textarea>
+        </div>
+        <div class="action-buttons">
+          <button id="downloadFixedLdif" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+            Download Fixed LDIF
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ─── THEME PANEL ─── -->
+<div class="theme-btn" id="theme-btn" title="Customize accent color">
+  <div class="theme-swatch" id="theme-swatch"></div>
+</div>
+<div class="theme-panel" id="theme-panel">
+  <div class="tp-title">Accent Color</div>
+  <div class="tp-presets" id="tp-presets"></div>
+  <div class="tp-input-row">
+    <span class="tp-hash">#</span>
+    <input class="tp-hex" id="tp-hex" maxlength="6" placeholder="66FF00" spellcheck="false">
+    <button class="tp-apply" id="tp-apply">Apply</button>
+  </div>
+  <div class="tp-error" id="tp-error"></div>
+  <div class="tp-live-row">
+    <div class="tp-live-dot" id="tp-live-dot"></div>
+    <span class="tp-live-label" id="tp-live-label">Current: #66FF00</span>
+  </div>
+</div>
+
+<script src="ldif-cleaner.js"></script>
+<script>
+/* ─── THEME ENGINE ─── */
+const PRESETS=[{hex:'66FF00',label:'Lime'},{hex:'6366F1',label:'Indigo'},{hex:'3B82F6',label:'Blue'},{hex:'F97316',label:'Orange'},{hex:'EC4899',label:'Pink'},{hex:'EAB308',label:'Amber'}];
+const root=document.documentElement;
+function hexToRgb(hex){hex=hex.replace(/^#/,'');if(hex.length===3)hex=hex.split('').map(c=>c+c).join('');if(hex.length!==6||!/^[0-9a-fA-F]{6}$/.test(hex))return null;const n=parseInt(hex,16);return{r:(n>>16)&255,g:(n>>8)&255,b:n&255}}
+function contrastColor(r,g,b){return(0.299*r+0.587*g+0.114*b)/255>0.55?'#080808':'#f0f0f0'}
+function applyAccent(hex){
+  hex=hex.replace(/^#/,'').toUpperCase();
+  const rgb=hexToRgb(hex);if(!rgb)return false;
+  const{r,g,b}=rgb;const fullHex=`#${hex}`;const rgbStr=`${r}, ${g}, ${b}`;
+  root.style.setProperty('--accent',fullHex);
+  root.style.setProperty('--accent-rgb',rgbStr);
+  document.getElementById('theme-swatch').style.background=fullHex;
+  document.getElementById('tp-live-dot').style.background=fullHex;
+  document.getElementById('tp-live-label').textContent=`Current: #${hex}`;
+  const txtColor=contrastColor(r,g,b);
+  document.querySelectorAll('.btn-accent').forEach(el=>{el.style.color=txtColor});
+  document.querySelectorAll('.tp-preset').forEach(el=>{el.classList.toggle('selected',el.dataset.hex===hex)});
+  document.getElementById('tp-hex').value=hex;
+  document.getElementById('tp-error').textContent='';
+  return true;
+}
+const presetsEl=document.getElementById('tp-presets');
+PRESETS.forEach(p=>{
+  const btn=document.createElement('button');
+  btn.className='tp-preset';btn.dataset.hex=p.hex;btn.title=p.label;btn.style.background=`#${p.hex}`;
+  if(p.hex==='66FF00')btn.classList.add('selected');
+  btn.addEventListener('click',()=>{applyAccent(p.hex);document.getElementById('tp-hex').value=p.hex});
+  presetsEl.appendChild(btn);
+});
+document.getElementById('tp-apply').addEventListener('click',()=>{const val=document.getElementById('tp-hex').value.trim();if(!applyAccent(val))document.getElementById('tp-error').textContent='Invalid hex — e.g. 3B82F6'});
+document.getElementById('tp-hex').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('tp-apply').click()});
+document.getElementById('tp-hex').addEventListener('input',e=>{e.target.value=e.target.value.toUpperCase();document.getElementById('tp-error').textContent='';if(e.target.value.length===6)applyAccent(e.target.value)});
+const themeBtn=document.getElementById('theme-btn');
+const themePanel=document.getElementById('theme-panel');
+themeBtn.addEventListener('click',e=>{e.stopPropagation();themePanel.classList.toggle('open')});
+document.addEventListener('click',e=>{if(!themePanel.contains(e.target))themePanel.classList.remove('open')});
+</script>
 </body>
-
 </html>
