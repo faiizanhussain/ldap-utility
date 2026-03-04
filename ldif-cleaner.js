@@ -284,14 +284,14 @@ const fixFileStatus = document.getElementById('fixFileStatus');
 fixDropZone.addEventListener('click', () => fixInput.click());
 fixDropZone.addEventListener('dragover', (e) => {
   e.preventDefault();
-  fixDropZone.style.backgroundColor = '#EBF4FF';
+  fixDropZone.classList.add('drag-over');
 });
 fixDropZone.addEventListener('dragleave', () => {
-  fixDropZone.style.backgroundColor = '';
+  fixDropZone.classList.remove('drag-over');
 });
 fixDropZone.addEventListener('drop', (e) => {
   e.preventDefault();
-  fixDropZone.style.backgroundColor = '';
+  fixDropZone.classList.remove('drag-over');
   if (e.dataTransfer.files.length > 0) {
     fixInput.files = e.dataTransfer.files;
     handleFixFileUpload();
@@ -511,14 +511,14 @@ const extractFileStatus = document.getElementById('extractFileStatus');
 extractDropZone.addEventListener('click', () => extractInput.click());
 extractDropZone.addEventListener('dragover', (e) => {
   e.preventDefault();
-  extractDropZone.style.backgroundColor = '#EBF4FF';
+  extractDropZone.classList.add('drag-over');
 });
 extractDropZone.addEventListener('dragleave', () => {
-  extractDropZone.style.backgroundColor = '';
+  extractDropZone.classList.remove('drag-over');
 });
 extractDropZone.addEventListener('drop', (e) => {
   e.preventDefault();
-  extractDropZone.style.backgroundColor = '';
+  extractDropZone.classList.remove('drag-over');
   if (e.dataTransfer.files.length > 0) {
     extractInput.files = e.dataTransfer.files;
     handleExtractFileUpload();
@@ -552,14 +552,14 @@ const masterFileStatus = document.getElementById('masterFileStatus');
 masterDropZone.addEventListener('click', () => masterInput.click());
 masterDropZone.addEventListener('dragover', (e) => {
   e.preventDefault();
-  masterDropZone.style.backgroundColor = '#EBF4FF';
+  masterDropZone.classList.add('drag-over');
 });
 masterDropZone.addEventListener('dragleave', () => {
-  masterDropZone.style.backgroundColor = '';
+  masterDropZone.classList.remove('drag-over');
 });
 masterDropZone.addEventListener('drop', (e) => {
   e.preventDefault();
-  masterDropZone.style.backgroundColor = '';
+  masterDropZone.classList.remove('drag-over');
   if (e.dataTransfer.files.length > 0) {
     masterInput.files = e.dataTransfer.files;
     handleMasterFileUpload();
