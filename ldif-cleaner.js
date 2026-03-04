@@ -14,6 +14,15 @@ class LdifDataCleaner {
     this.cleanedEntries = [];
     this.duplicates = [];
     this.fixOperations = [];
+    this.repeatableAttributes = new Set(['objectclass', 'replace']);
+  }
+
+  normalizeAttrName(name) {
+    return (name || '').toString().trim().toLowerCase();
+  }
+
+  isRepeatableAttribute(name) {
+    return this.repeatableAttributes.has(this.normalizeAttrName(name));
   }
 
   /**
@@ -150,39 +159,43 @@ class LdifDataCleaner {
 
     this.fixOperations.forEach(operation => {
       this.fixedEntries = this.fixedEntries.map(entry => {
-        const fieldLower = operation.field.toLowerCase();
+        const fieldLower = this.normalizeAttrName(operation.field);
+        const operationValue = (operation.value || '').toString().trim();
+        const isRepeatable = this.isRepeatableAttribute(fieldLower);
         
         // Handle DN
         if (fieldLower === 'dn') {
           if (operation.action === 'replace') {
             entry.dn = [operation.value];
           }
-        } 
-        // Handle ObjectClass
-        else if (fieldLower === 'objectclass') {
-          if (operation.action === 'add') {
-            if (!entry.objectclass) entry.objectclass = [];
-            if (!entry.objectclass.includes(operation.value)) {
-              entry.objectclass.push(operation.value);
-            }
-          } else if (operation.action === 'replace') {
-            entry.objectclass = [operation.value];
-          } else if (operation.action === 'remove') {
-            entry.objectclass = entry.objectclass.filter(oc => oc !== operation.value);
-          }
-        }
-        // Handle other attributes
-        else {
+        } else {
           const attrName = fieldLower;
           if (operation.action === 'add') {
             if (!entry[attrName]) entry[attrName] = [];
-            if (!entry[attrName].includes(operation.value)) {
-              entry[attrName].push(operation.value);
+            if (operationValue && !entry[attrName].includes(operationValue)) {
+              entry[attrName].push(operationValue);
             }
           } else if (operation.action === 'replace') {
-            entry[attrName] = [operation.value];
+            if (isRepeatable) {
+              if (!entry[attrName]) entry[attrName] = [];
+              if (operationValue && !entry[attrName].includes(operationValue)) {
+                entry[attrName].push(operationValue);
+              }
+            } else {
+              entry[attrName] = [operation.value];
+            }
           } else if (operation.action === 'remove') {
-            delete entry[attrName];
+            if (isRepeatable && operationValue) {
+              const currentValues = Array.isArray(entry[attrName]) ? entry[attrName] : [];
+              const filteredValues = currentValues.filter(value => value !== operationValue);
+              if (filteredValues.length > 0) {
+                entry[attrName] = filteredValues;
+              } else {
+                delete entry[attrName];
+              }
+            } else {
+              delete entry[attrName];
+            }
           }
         }
         
@@ -235,6 +248,11 @@ const dedupModeSection = document.getElementById('dedupMode');
 const fixOperationsSection = document.getElementById('fixOperations');
 const dedupResultsSection = document.getElementById('dedupResults');
 const fixOutputSection = document.getElementById('fixOutput');
+const repeatablePresetEl = document.getElementById('repeatablePreset');
+const addRepeatablePresetBtn = document.getElementById('addRepeatablePreset');
+const customRepeatableAttrEl = document.getElementById('customRepeatableAttr');
+const addCustomRepeatableBtn = document.getElementById('addCustomRepeatable');
+const repeatableAttributesListEl = document.getElementById('repeatableAttributesList');
 
 // Reset Button
 document.getElementById('resetBtn').addEventListener('click', () => {
@@ -363,6 +381,87 @@ function renderFixOperations() {
     });
   });
 }
+
+function toDisplayAttrName(attrName) {
+  const normalized = cleaner.normalizeAttrName(attrName);
+  if (normalized === 'objectclass') return 'objectClass';
+  return normalized;
+}
+
+function renderRepeatableAttributes() {
+  if (!repeatableAttributesListEl) return;
+
+  const attributes = Array.from(cleaner.repeatableAttributes).sort((a, b) => a.localeCompare(b));
+  repeatableAttributesListEl.innerHTML = '';
+
+  attributes.forEach(attr => {
+    const chip = document.createElement('span');
+    chip.className = 'repeatable-attribute-chip';
+
+    const text = document.createElement('span');
+    text.textContent = toDisplayAttrName(attr);
+    chip.appendChild(text);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.setAttribute('aria-label', `Remove ${attr} from repeatable attributes`);
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', () => {
+      cleaner.repeatableAttributes.delete(cleaner.normalizeAttrName(attr));
+      renderRepeatableAttributes();
+
+      if (cleaner.fixLdifContent) {
+        const fixed = cleaner.applyFixOperations();
+        const ldifOutput = cleaner.entriesToLdif(fixed);
+        document.getElementById('fixedLdifOutput').value = ldifOutput;
+        fixOutputSection.classList.remove('hidden');
+      }
+    });
+
+    chip.appendChild(removeBtn);
+    repeatableAttributesListEl.appendChild(chip);
+  });
+}
+
+function addRepeatableAttribute(attrName) {
+  const normalized = cleaner.normalizeAttrName(attrName);
+  if (!normalized) return;
+
+  cleaner.repeatableAttributes.add(normalized);
+  renderRepeatableAttributes();
+
+  if (cleaner.fixLdifContent) {
+    const fixed = cleaner.applyFixOperations();
+    const ldifOutput = cleaner.entriesToLdif(fixed);
+    document.getElementById('fixedLdifOutput').value = ldifOutput;
+    fixOutputSection.classList.remove('hidden');
+  }
+}
+
+if (addRepeatablePresetBtn) {
+  addRepeatablePresetBtn.addEventListener('click', () => {
+    addRepeatableAttribute(repeatablePresetEl.value);
+  });
+}
+
+if (addCustomRepeatableBtn) {
+  addCustomRepeatableBtn.addEventListener('click', () => {
+    addRepeatableAttribute(customRepeatableAttrEl.value);
+    customRepeatableAttrEl.value = '';
+  });
+}
+
+if (customRepeatableAttrEl) {
+  customRepeatableAttrEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addRepeatableAttribute(customRepeatableAttrEl.value);
+      customRepeatableAttrEl.value = '';
+    }
+  });
+}
+
+renderRepeatableAttributes();
 
 function removeFixOperation(idx) {
   cleaner.fixOperations.splice(idx, 1);

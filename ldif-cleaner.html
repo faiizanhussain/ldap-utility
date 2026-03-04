@@ -173,6 +173,32 @@
                     </div>
                     <div class="card-body">
                         <div class="fix-operations-container">
+                            <div class="repeatable-attributes-card">
+                                <div class="repeatable-attributes-header">
+                                    <h3>Repeatable Attributes</h3>
+                                    <p>These attributes keep multiple values across fixes (default: objectClass, replace)</p>
+                                </div>
+                                <div class="repeatable-attributes-controls">
+                                    <div class="form-group">
+                                        <label>Predefined Attribute</label>
+                                        <div class="repeatable-inline-controls">
+                                            <select id="repeatablePreset">
+                                                <option value="objectClass">objectClass</option>
+                                                <option value="replace">replace</option>
+                                            </select>
+                                            <button id="addRepeatablePreset" type="button" class="btn btn-secondary">Add</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Custom Repeatable Attribute</label>
+                                        <div class="repeatable-inline-controls">
+                                            <input type="text" id="customRepeatableAttr" placeholder="e.g., changetype" />
+                                            <button id="addCustomRepeatable" type="button" class="btn btn-secondary">Add</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="repeatableAttributesList" class="repeatable-attributes-list"></div>
+                            </div>
                             <div class="operations-list" id="fixOperationsList">
                                 <!-- Dynamic operations will be added here -->
                             </div>

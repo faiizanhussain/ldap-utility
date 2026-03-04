@@ -154,11 +154,18 @@ function applyDnTemplate(template, row, mappings) {
 function buildLdif(rows, req) {
   const lines = [];
   const warnings = [];
+  const entryMode = req.entryMode === 'modify' ? 'modify' : 'new';
+  const repeatableAttrs = new Set(
+    (req.repeatableAttributes && req.repeatableAttributes.length ? req.repeatableAttributes : ['objectclass', 'replace'])
+      .map((attr) => String(attr || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
 
   rows.forEach((row, idx) => {
     const attrLines = [];
     const usedAttrs = new Set();
-    const objectClasses = [];
+    const repeatableBuckets = new Map();
+    const modifyOperations = [];
     const dn = applyDnTemplate(req.dnTemplate, row, req.mappings);
 
     if (!dn || /\{.+\}/.test(dn)) {
@@ -173,13 +180,17 @@ function buildLdif(rows, req) {
       if (!target) return;
 
       const lower = target.toLowerCase();
-      if (lower === 'objectclass') {
-        // Allow multiple objectClass values; split literals/CSV content on whitespace, comma, or semicolon.
+      if (repeatableAttrs.has(lower)) {
+        // Allow multiple values for configured repeatable attributes.
         const parts = String(v).split(/[\s,;]+/).map((p) => p.trim()).filter(Boolean);
+        if (!repeatableBuckets.has(lower)) {
+          repeatableBuckets.set(lower, { attributeName: target, values: [] });
+        }
+        const bucket = repeatableBuckets.get(lower);
         if (parts.length) {
-          parts.forEach((p) => objectClasses.push(p));
+          parts.forEach((p) => bucket.values.push(p));
         } else {
-          objectClasses.push(v.trim());
+          bucket.values.push(v.trim());
         }
         return;
       }
@@ -190,13 +201,47 @@ function buildLdif(rows, req) {
       }
 
       usedAttrs.add(lower);
-      attrLines.push(`${target}: ${escapeLdif(v)}`);
+      if (entryMode === 'modify') {
+        modifyOperations.push({ attributeName: target, values: [v] });
+      } else {
+        attrLines.push(`${target}: ${escapeLdif(v)}`);
+      }
     });
 
-    const ocUnique = Array.from(new Set(objectClasses.map((oc) => oc.trim()).filter(Boolean)));
     const entryLines = [`dn: ${dn}`];
-    ocUnique.forEach((oc) => entryLines.push(`objectClass: ${escapeLdif(oc)}`));
-    entryLines.push(...attrLines);
+
+    const repeatableEntries = Array.from(repeatableBuckets.entries()).sort((a, b) => {
+      if (a[0] === 'objectclass') return -1;
+      if (b[0] === 'objectclass') return 1;
+      return 0;
+    });
+
+    if (entryMode === 'modify') {
+      entryLines.push('changetype: modify');
+
+      repeatableEntries.forEach(([, bucket]) => {
+        const uniqueValues = Array.from(new Set(bucket.values.map((val) => val.trim()).filter(Boolean)));
+        if (!uniqueValues.length) return;
+        modifyOperations.push({ attributeName: bucket.attributeName, values: uniqueValues });
+      });
+
+      modifyOperations.forEach((op) => {
+        entryLines.push(`replace: ${op.attributeName}`);
+        op.values.forEach((val) => {
+          entryLines.push(`${op.attributeName}: ${escapeLdif(val)}`);
+        });
+        entryLines.push('-');
+      });
+    } else {
+      repeatableEntries.forEach(([, bucket]) => {
+        const uniqueValues = Array.from(new Set(bucket.values.map((val) => val.trim()).filter(Boolean)));
+        uniqueValues.forEach((val) => {
+          entryLines.push(`${bucket.attributeName}: ${escapeLdif(val)}`);
+        });
+      });
+
+      entryLines.push(...attrLines);
+    }
 
     lines.push(entryLines.join('\n'));
     lines.push('');
@@ -243,6 +288,12 @@ const resetBtn = document.getElementById('resetBtn');
 const copyBtn = document.getElementById('copyBtn');
 const previewEl = document.getElementById('preview');
 const warningsEl = document.getElementById('warnings');
+const userRecordModeEl = document.getElementById('userRecordMode');
+const repeatablePresetEl = document.getElementById('repeatablePreset');
+const addRepeatablePresetBtn = document.getElementById('addRepeatablePreset');
+const customRepeatableAttrEl = document.getElementById('customRepeatableAttr');
+const addCustomRepeatableBtn = document.getElementById('addCustomRepeatable');
+const repeatableAttrsListEl = document.getElementById('repeatableAttrsList');
 
 // Groups mode elements
 const groupsInterface = document.getElementById('groupsInterface');
@@ -260,6 +311,8 @@ let selectedAttribute = null;
 let lastResult = null;
 let operations = []; // For groups mode: [{id, groupDn, operation, memberAttr, csvColumn, memberDnTemplate}]
 let operationIdCounter = 0;
+let repeatableAttrs = new Set(['objectclass', 'replace']);
+let userRecordMode = 'new';
 
 // Common LDIF attributes
 // const commonLdifAttrs = [
@@ -268,6 +321,44 @@ let operationIdCounter = 0;
 //   'department', 'manager', 'street', 'l', 'st', 'postalCode', 'c'
 // ];
 const commonLdifAttrs = [];
+
+function normalizeAttrName(attr) {
+  return String(attr || '').trim().toLowerCase();
+}
+
+function formatAttrName(attr) {
+  const lower = normalizeAttrName(attr);
+  if (lower === 'objectclass') return 'objectClass';
+  return lower;
+}
+
+function renderRepeatableAttrs() {
+  if (!repeatableAttrsListEl) return;
+
+  const attrs = Array.from(repeatableAttrs).sort((a, b) => a.localeCompare(b));
+  repeatableAttrsListEl.innerHTML = attrs.length
+    ? attrs.map((attr) => `
+        <span class="selected-chip">
+          ${formatAttrName(attr)}
+          <button type="button" data-remove-repeatable="${attr}">×</button>
+        </span>
+      `).join('')
+    : '<span style="color: var(--text-muted); font-size: 13px;">No repeatable attributes configured.</span>';
+}
+
+function addRepeatableAttr(attr) {
+  const normalized = normalizeAttrName(attr);
+  if (!normalized) return;
+  repeatableAttrs.add(normalized);
+  renderRepeatableAttrs();
+}
+
+function removeRepeatableAttr(attr) {
+  const normalized = normalizeAttrName(attr);
+  if (!normalized) return;
+  repeatableAttrs.delete(normalized);
+  renderRepeatableAttrs();
+}
 
 // ===== Render Functions =====
 function renderLdifAttributes() {
@@ -416,6 +507,16 @@ async function handleCsvFile(file) {
   csvStatus.textContent = `${file.name} • ${csvRows.length} rows, ${csvHeaders.length} columns`;
   csvDropZone.classList.add('has-file');
 
+  if (appMode === 'create') {
+    const isModify = window.confirm(
+      'Is this for OLD users you want to modify?\n\nClick OK for old users (modify mode).\nClick Cancel for new users (create mode).'
+    );
+    userRecordMode = isModify ? 'modify' : 'new';
+    if (userRecordModeEl) {
+      userRecordModeEl.value = userRecordMode;
+    }
+  }
+
   mappingHint.style.display = 'none';
   
   // Show appropriate interface based on mode
@@ -526,6 +627,43 @@ selectedFieldsList.addEventListener('click', (e) => {
   renderMappingDetails();
 });
 
+if (repeatableAttrsListEl) {
+  repeatableAttrsListEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-remove-repeatable]');
+    if (!btn) return;
+    removeRepeatableAttr(btn.dataset.removeRepeatable);
+  });
+}
+
+if (addRepeatablePresetBtn) {
+  addRepeatablePresetBtn.addEventListener('click', () => {
+    addRepeatableAttr(repeatablePresetEl.value);
+  });
+}
+
+if (addCustomRepeatableBtn) {
+  addCustomRepeatableBtn.addEventListener('click', () => {
+    addRepeatableAttr(customRepeatableAttrEl.value);
+    customRepeatableAttrEl.value = '';
+  });
+}
+
+if (customRepeatableAttrEl) {
+  customRepeatableAttrEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addRepeatableAttr(customRepeatableAttrEl.value);
+      customRepeatableAttrEl.value = '';
+    }
+  });
+}
+
+if (userRecordModeEl) {
+  userRecordModeEl.addEventListener('change', (e) => {
+    userRecordMode = e.target.value === 'modify' ? 'modify' : 'new';
+  });
+}
+
 concatSeparator.addEventListener('input', updateMapping);
 concatTrim.addEventListener('change', updateMapping);
 concatSkipEmpty.addEventListener('change', updateMapping);
@@ -612,6 +750,8 @@ convertBtn.addEventListener('click', () => {
     result = buildLdif(csvRows, {
       dnTemplate: dnTemplateEl.value,
       mappings: mappingsArray,
+      repeatableAttributes: Array.from(repeatableAttrs),
+      entryMode: userRecordMode,
     });
   }
 
@@ -679,6 +819,10 @@ resetBtn.addEventListener('click', () => {
   // Reset groups mode state
   operations = [];
   operationIdCounter = 0;
+  repeatableAttrs = new Set(['objectclass', 'replace']);
+  userRecordMode = 'new';
+  if (userRecordModeEl) userRecordModeEl.value = 'new';
+  renderRepeatableAttrs();
   renderOperations();
 });
 
@@ -713,12 +857,57 @@ function updateModeUI() {
   }
 }
 
+renderRepeatableAttrs();
+
 // ===== Groups Mode Functions =====
 function buildGroupOperationsLdif(rows, operations) {
   const lines = [];
   const warnings = [];
 
   operations.forEach((op) => {
+    if ((op.targetType || 'group') === 'user') {
+      const attrName = (op.userAttrName || '').trim();
+      if (!attrName) {
+        warnings.push(`Operation #${op.id}: Target attribute is required for single-user modify.`);
+        return;
+      }
+
+      if (!op.userCnColumn) {
+        warnings.push(`Operation #${op.id}: CN column is required for single-user modify.`);
+        return;
+      }
+
+      rows.forEach((row, idx) => {
+        const cnValue = String(row[op.userCnColumn] ?? '').trim();
+        if (!cnValue) {
+          warnings.push(`Row ${idx + 1}: Empty CN value for column "${op.userCnColumn}"`);
+          return;
+        }
+
+        const userDn = (op.userDnTemplate || 'cn={cn},cn=users,dc=example,dc=com')
+          .replace(/\{cn\}/gi, cnValue)
+          .replace(/\{value\}/gi, cnValue);
+
+        const value = String(row[op.userValueColumn] ?? '').trim();
+        if ((op.operation === 'add' || op.operation === 'replace') && !value) {
+          warnings.push(`Row ${idx + 1}: Empty value for column "${op.userValueColumn}"`);
+          return;
+        }
+
+        lines.push(`dn: ${userDn}`);
+        lines.push('changetype: modify');
+        lines.push(`${op.operation}: ${attrName}`);
+
+        if (op.operation !== 'delete' || value) {
+          lines.push(`${attrName}: ${escapeLdif(value)}`);
+        }
+
+        lines.push('');
+      });
+
+      return;
+    }
+
     if (op.useGroupColumn) {
       // Dynamic groups from CSV column
       const groupMap = new Map(); // Map of groupDn => members
@@ -806,13 +995,25 @@ function renderOperations() {
   }
 
   groupsHint.style.display = 'none';
-  operationsList.innerHTML = operations.map((op) => `
+  operationsList.innerHTML = operations.map((op) => {
+    const targetType = op.targetType || 'group';
+    return `
     <div class="operation-card" data-op-id="${op.id}">
       <div class="operation-header">
         <h4>Operation #${op.id}</h4>
         <button class="btn btn-secondary btn-sm" onclick="removeOperation(${op.id})">Remove</button>
       </div>
       <div class="operation-body">
+        <div class="form-group">
+          <label>Operation Target</label>
+          <select class="input" onchange="updateOperation(${op.id}, 'targetType', this.value)">
+            <option value="group" ${targetType === 'group' ? 'selected' : ''}>Group Membership</option>
+            <option value="user" ${targetType === 'user' ? 'selected' : ''}>Single User Attribute</option>
+          </select>
+          <span class="hint">Choose whether this operation updates group members or modifies each user entry directly.</span>
+        </div>
+
+        ${targetType === 'group' ? `
         <div class="form-group toggle-item">
           <label>
             <input type="checkbox" ${op.useGroupColumn ? 'checked' : ''} onchange="updateOperation(${op.id}, 'useGroupColumn', this.checked)" />
@@ -879,9 +1080,48 @@ function renderOperations() {
           <input type="text" class="input" value="${op.memberDnTemplate}" onchange="updateOperation(${op.id}, 'memberDnTemplate', this.value)" placeholder="cn={value},cn=users,dc=example,dc=com" />
           <span class="hint">Use {value} as placeholder for the member column value</span>
         </div>
+        ` : ''}
+
+        ${targetType === 'user' ? `
+        <div class="operation-row">
+          <div class="form-group">
+            <label>Operation</label>
+            <select class="input" onchange="updateOperation(${op.id}, 'operation', this.value)">
+              <option value="add" ${op.operation === 'add' ? 'selected' : ''}>Add Value</option>
+              <option value="delete" ${op.operation === 'delete' ? 'selected' : ''}>Delete Value</option>
+              <option value="replace" ${op.operation === 'replace' ? 'selected' : ''}>Replace Value</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>CN Column</label>
+            <select class="input" onchange="updateOperation(${op.id}, 'userCnColumn', this.value)">
+              ${csvHeaders.map((col) => `<option value="${col}" ${op.userCnColumn === col ? 'selected' : ''}>${col}</option>`).join('')}
+            </select>
+            <span class="hint">CSV column that contains the user CN.</span>
+          </div>
+          <div class="form-group">
+            <label>Value Column</label>
+            <select class="input" onchange="updateOperation(${op.id}, 'userValueColumn', this.value)">
+              ${csvHeaders.map((col) => `<option value="${col}" ${op.userValueColumn === col ? 'selected' : ''}>${col}</option>`).join('')}
+            </select>
+            <span class="hint">CSV column containing the value to write on the target attribute.</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Target Attribute</label>
+          <input type="text" class="input" value="${op.userAttrName}" onchange="updateOperation(${op.id}, 'userAttrName', this.value)" placeholder="mail, title, departmentNumber..." />
+          <span class="hint">LDAP attribute to modify for each user DN.</span>
+        </div>
+        <div class="form-group">
+          <label>User DN Template</label>
+          <input type="text" class="input" value="${op.userDnTemplate}" onchange="updateOperation(${op.id}, 'userDnTemplate', this.value)" placeholder="cn={cn},cn=users,dc=example,dc=com" />
+          <span class="hint">Use {cn} as placeholder for the CN column value.</span>
+        </div>
+        ` : ''}
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function addOperation() {
@@ -892,6 +1132,7 @@ function addOperation() {
 
   const newOp = {
     id: ++operationIdCounter,
+    targetType: 'group',
     groupDn: 'cn=GroupName,cn=groups,dc=example,dc=com',
     operation: 'add',
     memberAttr: 'member',
@@ -900,7 +1141,11 @@ function addOperation() {
     useGroupColumn: false,
     groupColumn: '',
     groupDnTemplate: 'cn={value},cn=groups,dc=example,dc=com',
-    groupDelimiter: ';'
+    groupDelimiter: ';',
+    userCnColumn: csvHeaders[0],
+    userValueColumn: csvHeaders[Math.min(1, csvHeaders.length - 1)] || csvHeaders[0],
+    userAttrName: 'mail',
+    userDnTemplate: 'cn={cn},cn=users,dc=example,dc=com'
   };
   
   operations.push(newOp);

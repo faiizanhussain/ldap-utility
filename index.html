@@ -212,6 +212,14 @@ mail: john.doe@example.com"></textarea>
                 <input type="text" id="delimiter" class="input" value="," placeholder="," />
                 <span class="hint">Auto-detected from CSV</span>
               </div>
+              <div class="form-group create-mode-only">
+                <label for="userRecordMode">LDIF Mode</label>
+                <select id="userRecordMode" class="input">
+                  <option value="new">New Users (Create Entries)</option>
+                  <option value="modify">Old Users (Modify Existing)</option>
+                </select>
+                <span class="hint">You will be asked after CSV upload. You can change it here anytime.</span>
+              </div>
               <div class="form-group flex-grow create-mode-only">
                 <label for="dnTemplate">DN Template</label>
                 <input type="text" id="dnTemplate" class="input" value="cn={cn},cn=users,dc=maliyah,dc=gov" />
@@ -340,6 +348,22 @@ mail: john.doe@example.com"></textarea>
                       </label>
                     </div>
                   </div>
+                  <div class="literal-row">
+                    <label>Repeatable Attributes</label>
+                    <div class="literal-controls">
+                      <select id="repeatablePreset" class="input">
+                        <option value="objectClass">objectClass</option>
+                        <option value="replace">replace</option>
+                      </select>
+                      <button class="btn btn-outline btn-sm" id="addRepeatablePreset" type="button">Add Preset</button>
+                    </div>
+                    <div class="literal-controls" style="margin-top: 8px;">
+                      <input type="text" id="customRepeatableAttr" class="input" placeholder="Custom attribute (e.g., changetype)" />
+                      <button class="btn btn-outline btn-sm" id="addCustomRepeatable" type="button">Add Custom</button>
+                    </div>
+                    <span class="hint">Default repeatable attributes are objectClass and replace.</span>
+                    <div id="repeatableAttrsList" class="selected-list" style="margin-top: 8px;"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -355,7 +379,7 @@ mail: john.doe@example.com"></textarea>
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
                 <p>No operations configured</p>
-                <span>Click "+ Add Operation" to start adding members to groups</span>
+                <span>Click "+ Add Operation" to add group membership updates or single-user attribute modifications</span>
               </div>
               <div id="operationsList" class="operations-list"></div>
             </div>

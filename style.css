@@ -1407,6 +1407,86 @@ select.input {
   gap: 16px;
 }
 
+.repeatable-attributes-card {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: #FAFAFA;
+  padding: 16px;
+}
+
+.repeatable-attributes-header {
+  margin-bottom: 12px;
+}
+
+.repeatable-attributes-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.repeatable-attributes-header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.repeatable-attributes-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.repeatable-inline-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.repeatable-inline-controls input,
+.repeatable-inline-controls select {
+  flex: 1;
+}
+
+.repeatable-inline-controls .btn {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.repeatable-attributes-list {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.repeatable-attribute-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--primary);
+  background: var(--primary-light);
+  border: 1px solid #B3D7F0;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.repeatable-attribute-chip button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.repeatable-attribute-chip button:hover {
+  color: var(--primary-hover);
+}
+
 .upload-label {
   display: block;
   font-size: 13px;
